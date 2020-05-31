@@ -1,5 +1,10 @@
 # game_score_board
 
+**warn: this project contains the following images that are NOT available for commercial use**:
+- src/assets/chunithm-logo.png
+- src/assets/arcaea-logo.png
+
+
 ## Project setup
 ```
 npm install
