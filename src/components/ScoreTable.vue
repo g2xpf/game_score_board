@@ -3,7 +3,11 @@
     <v-subheader class="title">
       {{ name }} Score Board
       <v-spacer></v-spacer>
-      <create-dialog :sample="sample" @createRequested="createItem" />
+      <create-dialog
+        :sample="sample"
+        :onConstantRequested="onConstantRequested"
+        @createRequested="createItem"
+      />
     </v-subheader>
 
     <v-divider></v-divider>
@@ -22,12 +26,20 @@
         class="my-2"
         :footer-props="pagenationOption"
         :items="scores"
-        :headers="headers.concat([{text: '更新/削除', value: 'actions', sortable: false}])"
+        :headers="
+          headers.concat([
+            { text: '更新/削除', value: 'actions', sortable: false },
+          ])
+        "
       >
         <template v-slot:top></template>
         <template v-slot:item.actions="{ item }">
           <delete-dialog @deleteRequested="deleteItem(item)" />
-          <update-dialog :sample="sample" :data="item" @updateRequested="updateItem" />
+          <update-dialog
+            :sample="sample"
+            :data="item"
+            @updateRequested="updateItem"
+          />
         </template>
       </v-data-table>
     </v-card>
@@ -36,21 +48,26 @@
 
 <script lang="ts">
 import { Vue, Component, Prop } from "vue-property-decorator";
-import DB, { ResponseTypeSample } from '@/lib/DB';
-import type { DBEntry } from '@/lib/DB';
-import DeleteDialog from './DeleteDialog.vue';
-import CreateDialog from './CreateDialog.vue';
-import UpdateDialog from './UpdateDialog.vue';
+import DB, { ResponseTypeSample } from "@/lib/DB";
+import type { DBEntry } from "@/lib/DB";
+import DeleteDialog from "./DeleteDialog.vue";
+import CreateDialog from "./CreateDialog.vue";
+import UpdateDialog from "./UpdateDialog.vue";
 
 interface ScoreHeader {
   text: string;
   value: string;
-};
+}
 
 export type ScoreHeaders = ScoreHeader[];
 
-@Component({components: {DeleteDialog, CreateDialog, UpdateDialog}})
-export default class ScoreTable<Key extends DBEntry, Value extends DBEntry, Marker extends DBEntry, ScoreEntry extends Key & Value> extends Vue {
+@Component({ components: { DeleteDialog, CreateDialog, UpdateDialog } })
+export default class ScoreTable<
+  Key extends DBEntry,
+  Value extends DBEntry,
+  Marker extends DBEntry,
+  ScoreEntry extends Key & Value
+> extends Vue {
   @Prop()
   name!: string;
 
@@ -66,16 +83,22 @@ export default class ScoreTable<Key extends DBEntry, Value extends DBEntry, Mark
   @Prop()
   headers!: ScoreHeaders;
 
-  @Prop({default: null})
-  extraInfo?: {[index: string]: unknown} | null;
+  @Prop({ default: null })
+  extraInfo?: { [index: string]: unknown } | null;
 
-  private pagenationOption = {'items-per-page-options': [10, 30, 50, -1]};
+  @Prop()
+  onConstantRequested!: (
+    name: string,
+    difficulty: number
+  ) => Promise<number | undefined>;
+
+  private pagenationOption = { "items-per-page-options": [10, 30, 50, -1] };
   private deleteDialog: boolean = false;
   private createDialog: boolean = false;
 
   private db: DB<Key, Value, Marker> | null = null;
 
-  private items: [Key, Value,  Marker][] = [];
+  private items: [Key, Value, Marker][] = [];
 
   async mounted() {
     try {
@@ -96,11 +119,11 @@ export default class ScoreTable<Key extends DBEntry, Value extends DBEntry, Mark
   async updateItem(item: Key & Value) {
     let keyObj: any = {};
     let valueObj: any = {};
-    for(let key in this.sample.key) {
+    for (let key in this.sample.key) {
       keyObj[key] = item[key];
     }
 
-    for(let key in this.sample.value) {
+    for (let key in this.sample.value) {
       valueObj[key] = item[key];
     }
     await this.db!.edit(keyObj, valueObj);
@@ -110,8 +133,8 @@ export default class ScoreTable<Key extends DBEntry, Value extends DBEntry, Mark
 
   async deleteItem(item: ScoreEntry) {
     let obj: any = {};
-    for(let key in this.sample.key) {
-      obj[key] = item[key]
+    for (let key in this.sample.key) {
+      obj[key] = item[key];
     }
     await this.db!.delete(obj);
     this.items = await this.db!.getAll();

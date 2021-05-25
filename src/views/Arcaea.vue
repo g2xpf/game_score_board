@@ -6,6 +6,7 @@
     dbname="arcaea"
     :sample="responseTypeSample"
     @updated="onScoreUpdated"
+    :onConstantRequested="onConstantRequested"
     :extraInfo="extraInfo"
   />
 </template>
@@ -14,7 +15,7 @@
 import { Vue, Component } from "vue-property-decorator";
 import RawScoreTable, { ScoreHeaders } from "@/components/ScoreTable.vue";
 import { mixins } from "vue-class-component";
-import type { ResponseTypeSample } from '@/lib/DB';
+import type { ResponseTypeSample } from "@/lib/DB";
 
 enum Difficulty {
   Past,
@@ -40,18 +41,20 @@ interface ScoreEntry {
 }
 
 interface ExtraInfo {
-  Potential: number,
+  Potential: number;
 }
 
 @Component
-class ScoreTable extends mixins<RawScoreTable<DBKey, DBValue, DBMarker, ScoreEntry>>(
-  RawScoreTable
-) {}
+class ScoreTable extends mixins<
+  RawScoreTable<DBKey, DBValue, DBMarker, ScoreEntry>
+>(RawScoreTable) {}
 
 @Component({ components: { ScoreTable } })
 export default class Arcaea extends Vue {
   private scores: ScoreEntry[] = [];
-  private extraInfo: ExtraInfo = {Potential: 0.0};
+  private extraInfo: ExtraInfo = { Potential: 0.0 };
+
+  private domCache: Document | null = null;
 
   private scoreHeaders: ScoreHeaders = [
     { text: "曲名", value: "name" },
@@ -66,15 +69,15 @@ export default class Arcaea extends Vue {
   private responseTypeSample: ResponseTypeSample = {
     key: {
       name: "string",
-      difficulty: "number"
+      difficulty: "number",
     },
     value: {
       score: "number",
-      constant: "number"
+      constant: "number",
     },
     marker: {
-      updated_at: "Date"
-    }
+      updated_at: "Date",
+    },
   };
 
   private timeFmt(str: string) {
@@ -85,25 +88,26 @@ export default class Arcaea extends Vue {
   }
 
   private getRank(score: number): string {
-      return score <= 8599999
-          ? "D" 
-          : score <= 8899999
-          ? "C"
-          : score <= 9199999
-          ? "B"
-          : score <= 9499999
-          ? "A"
-          : score <= 9799999
-          ? "AA"
-          : score <= 9899999
-          ? "EX"
-          : score <= 9999999
-          ? "EX+"
-          : "PM";
+    return score <= 8599999
+      ? "D"
+      : score <= 8899999
+      ? "C"
+      : score <= 9199999
+      ? "B"
+      : score <= 9499999
+      ? "A"
+      : score <= 9799999
+      ? "AA"
+      : score <= 9899999
+      ? "EX"
+      : score <= 9999999
+      ? "EX+"
+      : "PM";
   }
 
   private formatDate(date: Date): string {
-    return date.getFullYear() +
+    return (
+      date.getFullYear() +
       "/" +
       (1 + date.getMonth()) +
       "/" +
@@ -114,27 +118,28 @@ export default class Arcaea extends Vue {
       this.timeFmt("" + date.getMinutes()) +
       ":" +
       this.timeFmt("" + date.getSeconds())
+    );
   }
 
   private getPotential(score: number, constant: number): number {
     return score <= 9800000
       ? Math.max(0, constant + (score - 9500000) / 300000)
       : score <= 10000000
-      ? (constant + 1.0 + (score - 9800000) / 200000)
+      ? constant + 1.0 + (score - 9800000) / 200000
       : constant + 2.0;
   }
 
-
-  private getPotentialBest(data: {potential: number}[]) {
-    const potential = data
-      .map(e => e.potential)
-      .sort((l, r) => {
-        if (l > r) return -1;
-        else if (l < r) return 1;
-        else return 0;
-      })
-      .slice(0, 30)
-      .reduce((acc, v) => acc + v) / Math.min(30, data.length);
+  private getPotentialBest(data: { potential: number }[]) {
+    const potential =
+      data
+        .map((e) => e.potential)
+        .sort((l, r) => {
+          if (l > r) return -1;
+          else if (l < r) return 1;
+          else return 0;
+        })
+        .slice(0, 30)
+        .reduce((acc, v) => acc + v) / Math.min(30, data.length);
 
     return Math.floor(potential * 100000) / 100000;
   }
@@ -150,10 +155,49 @@ export default class Arcaea extends Vue {
       const potentialFixed = potential.toFixed(3);
       const updated_at = this.formatDate(date);
       const difficultyName = Difficulty[key.difficulty];
-      return {  ...key, ...value, ...marker, potential, potentialFixed, rank, updated_at, difficultyName };
+      return {
+        ...key,
+        ...value,
+        ...marker,
+        potential,
+        potentialFixed,
+        rank,
+        updated_at,
+        difficultyName,
+      };
     });
 
     this.extraInfo.Potential = this.getPotentialBest(this.scores);
+  }
+
+  async onConstantRequested(name: string, difficulty: Difficulty) {
+    if (this.domCache === null) {
+      const response = await fetch(
+        "https://wikiwiki.jp/arcaea/%E3%83%9D%E3%83%86%E3%83%B3%E3%82%B7%E3%83%A3%E3%83%AB%E7%A0%94%E7%A9%B6%E6%89%80"
+      );
+      const text = await response.text();
+      const parser = new DOMParser();
+      const dom = parser.parseFromString(text, "text/html");
+      if (!!text) {
+        this.domCache = dom;
+      }
+    }
+    if (this.domCache === null) return undefined;
+
+    return Number(
+      Array.from(this.domCache.getElementsByTagName("tr"))
+        .map((v) => v.children)
+        .filter((v) => {
+          const tr = <HTMLTableRowElement>v[0].children[0];
+          if (!tr) return undefined;
+          return tr.title === name;
+        })
+        .map((v) => {
+          const td = <HTMLTableDataCellElement>v[4];
+          if (!td) return undefined;
+          return td.innerText;
+        })[difficulty]
+    );
   }
 }
 </script>

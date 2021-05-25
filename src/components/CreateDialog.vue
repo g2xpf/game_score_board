@@ -12,9 +12,44 @@
       <v-card-text>
         <v-container>
           <v-row v-for="[key, value] in kvPairs" :key="key">
-            <v-col>
-              <v-text-field :label="key" v-model="data[key]" v-if="value === 'string'" required></v-text-field>
-              <v-select :label="key" v-model="data[key]" v-if="value === 'boolean'" required></v-select>
+            <template v-if="key === 'constant'">
+              <v-col cols="10">
+                <v-text-field
+                  :label="key"
+                  v-model="data[key]"
+                  required
+                ></v-text-field>
+              </v-col>
+              <v-col cols="2">
+                <v-btn
+                  @click="
+                    onClickUpdateConstant(
+                      data['name'],
+                      data['difficulty']
+                    ).then((v) => {
+                      if (v) {
+                        data[key] = v;
+                      }
+                    })
+                  "
+                  >取得</v-btn
+                >
+              </v-col>
+            </template>
+
+            <v-col v-else>
+              <v-text-field
+                :label="key"
+                v-model="data[key]"
+                v-if="value === 'string'"
+                required
+              ></v-text-field>
+              <v-select
+                :label="key"
+                v-model="data[key]"
+                v-if="value === 'boolean'"
+                required
+              ></v-select>
               <v-text-field
                 :label="key"
                 v-model="data[key]"
@@ -35,8 +70,15 @@
       </v-card-text>
       <v-card-actions>
         <v-spacer></v-spacer>
-        <v-btn color="blue darken-1" text @click="dialog = false">キャンセル</v-btn>
-        <v-btn color="blue darken-1" text @click="dialog = false, createRequest()">登録</v-btn>
+        <v-btn color="blue darken-1" text @click="dialog = false"
+          >キャンセル</v-btn
+        >
+        <v-btn
+          color="blue darken-1"
+          text
+          @click="(dialog = false), createRequest()"
+          >登録</v-btn
+        >
       </v-card-actions>
     </v-card>
   </v-dialog>
@@ -55,6 +97,12 @@ export default class CreateDialog<
   sample!: ResponseTypeSample;
 
   private data: Partial<Key & Value> = this.initData();
+
+  @Prop()
+  onConstantRequested!: (
+    name: string,
+    difficulty: number
+  ) => Promise<number | undefined>;
 
   private dialog: boolean = false;
 
@@ -88,6 +136,19 @@ export default class CreateDialog<
   createRequest() {
     this.$emit("createRequested", this.data);
     this.data = this.initData();
+  }
+
+  async onClickUpdateConstant(
+    name: string,
+    difficulty: number
+  ): Promise<number | undefined> {
+    const constant = await this.onConstantRequested(name, difficulty);
+    if (constant === undefined) {
+      console.error(
+        `failed to fetch constant: name: ${name}, difficulty: ${difficulty}`
+      );
+    }
+    return constant;
   }
 }
 </script>
